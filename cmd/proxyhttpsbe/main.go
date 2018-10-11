@@ -14,6 +14,68 @@
 
 package main
 
+import (
+	"crypto/tls"
+	"flag"
+	"fmt"
+	"io"
+	"log"
+	"net"
+)
+
+var (
+	flagHost     string
+	flagPort     int
+	httpsBackend string
+)
+
+func init() {
+	flag.StringVar(&flagHost, "host", "github.com", "Host of the proxied https backend")
+	flag.IntVar(&flagPort, "port", 443, "Port of the proxied https backend")
+}
+
+func handleConn(from net.Conn) {
+	config := tls.Config{InsecureSkipVerify: true}
+	to, err := tls.Dial("tcp", httpsBackend, &config)
+	if err != nil {
+		log.Printf("%v", err)
+	} else {
+		done := make(chan struct{})
+		go func() {
+			defer from.Close()
+			defer to.Close()
+			io.Copy(from, to)
+			done <- struct{}{}
+		}()
+
+		go func() {
+			defer from.Close()
+			defer to.Close()
+			io.Copy(to, from)
+			done <- struct{}{}
+		}()
+
+		<-done
+		<-done
+	}
+}
+
 func main() {
-	// TODO
+	flag.Parse()
+	httpsBackend = fmt.Sprintf("%s:%d", flagHost, flagPort)
+
+	log.Printf("Proxy server is serving at port 8443 to backend %s", httpsBackend)
+	listener, err := net.Listen("tcp", ":8443")
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	for {
+		conn, err := listener.Accept()
+		if err != nil {
+			log.Printf("%v", err)
+		} else {
+			go handleConn(conn)
+		}
+	}
 }
