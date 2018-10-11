@@ -14,8 +14,32 @@
 
 package main
 
-import "testing"
+import (
+	"net/http"
+	"testing"
+)
 
 func TestMain(t *testing.T) {
-	// TODO
+	go proxy("github.com:443")
+
+	testcases := []struct {
+		name  string
+		title string
+	}{
+		{"Github", "Github"},
+	}
+
+	for _, tc := range testcases {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			resp, err := http.Get("http://localhost:8443")
+			if err != nil {
+				t.Fatal(err)
+			}
+			if resp.StatusCode != http.StatusOK {
+				t.Fatalf("status code error | expected %d | got %d", http.StatusOK, resp.StatusCode)
+			}
+		})
+	}
+
 }

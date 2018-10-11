@@ -34,9 +34,9 @@ func init() {
 	flag.IntVar(&flagPort, "port", 443, "Port of the proxied https backend")
 }
 
-func handleConn(from net.Conn) {
+func handleConn(from net.Conn, backend string) {
 	config := tls.Config{InsecureSkipVerify: true}
-	to, err := tls.Dial("tcp", httpsBackend, &config)
+	to, err := tls.Dial("tcp", backend, &config)
 	if err != nil {
 		log.Printf("%v", err)
 	} else {
@@ -60,11 +60,7 @@ func handleConn(from net.Conn) {
 	}
 }
 
-func main() {
-	flag.Parse()
-	httpsBackend = fmt.Sprintf("%s:%d", flagHost, flagPort)
-
-	log.Printf("Proxy server is serving at port 8443 to backend %s", httpsBackend)
+func proxy(backend string) {
 	listener, err := net.Listen("tcp", ":8443")
 	if err != nil {
 		log.Fatal(err)
@@ -75,7 +71,15 @@ func main() {
 		if err != nil {
 			log.Printf("%v", err)
 		} else {
-			go handleConn(conn)
+			go handleConn(conn, backend)
 		}
 	}
+}
+
+func main() {
+	flag.Parse()
+	httpsBackend = fmt.Sprintf("%s:%d", flagHost, flagPort)
+
+	log.Printf("Proxy server is serving at port 8443 to backend %s", httpsBackend)
+	proxy(httpsBackend)
 }
